@@ -141,6 +141,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
             preds = model(data)
             #preds = preds.unsqueeze(1) # reshape to (batch_size, 1)
             # 4. Compute loss
+            target = target.unsqueeze(1)
             loss =+ criterion(target, preds) #Careful, some other loss functions alternate input order
             # 5. Backward pass
             loss.backward()
@@ -181,6 +182,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
                 preds = model(data)
                 #preds = preds.unsqueeze(1) # reshape to (batch_size, 1)
                 # 4 Compute loss
+                target = target.unsqueeze(1)
                 loss = criterion(target, preds)
 
                 # Update validation loss/epochs
