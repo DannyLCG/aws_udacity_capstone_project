@@ -1,3 +1,4 @@
+import os 
 import sys
 import math
 import time
@@ -7,6 +8,7 @@ from tqdm import tqdm
 
 from utils.encoder import OneHotEncoder
 
+import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import torch
@@ -123,11 +125,11 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
     # move model to device
     model.to(device)
     logger.info("Model moved to %s", device)
-    # Set model in training mode
-    model.train()
-
+    
     # 0. Loop through epochs
     for epoch in tqdm(range(1, epochs + 1), desc="Training"):
+        # Set model in training mode
+        model.train()
         train_loss = 0
         train_preds, train_targets = [], []
 
@@ -142,7 +144,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
             #preds = preds.unsqueeze(1) # reshape to (batch_size, 1)
             # 4. Compute loss
             target = target.unsqueeze(1)
-            loss =+ criterion(target, preds) #Careful, some other loss functions alternate input order
+            loss = criterion(target, preds) #Careful, some other loss functions alternate input order
             # 5. Backward pass
             loss.backward()
             # 6. Update weights
@@ -154,7 +156,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
             train_targets.extend(target.cpu().detach().numpy())
 
         # Compute training metrics
-        train_loss = train_loss / len(train_loader.dataset)
+        train_loss = train_loss / len(train_loader) #Avg. loss per epoch
         train_mse = mean_squared_error(train_targets, train_preds)
         train_rmse = np.sqrt(train_mse)
         train_mae = mean_absolute_error(train_targets, train_preds)
@@ -191,7 +193,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
                 val_targets.extend(target.cpu().detach().numpy())
 
             # Compute validation metrics
-            val_loss /= len(val_loader.dataset)
+            val_loss /= len(val_loader) #avg. loss per epoch
             val_mse = mean_squared_error(val_targets, val_preds)
             val_rmse = np.sqrt(val_mse)
             val_r2 = r2_score(val_targets, val_preds)
@@ -204,3 +206,76 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
                         val_rmse, val_mae)
 
     logger.info("Finished training for %ds epochs.", epochs)
+
+def load_data(dataset_dir):
+    '''Function to load sequence data from a given directory.
+    -------------------------------------------------
+    Params:
+        dataset_dir: str, The path pointong to the data in csv format.
+    '''
+    # Note: SageMaker stores training data under '/opt/ml/input/data/
+    # Find the csv file in the provided dir
+    file_path = [f for f in os.listdir(dataset_dir) if f.endswith("csv")][0]
+    full_path = os.path.join(dataset_dir, file_path)
+    # Load data from csv file and extract relevant fields
+    dataset = pd.read_csv(full_path)
+
+    sequence_data = np.array(dataset["sequence"])
+
+    if 'pMIC' in dataset.columns:
+        target_data = np.array(dataset["pMIC"])
+        return sequence_data, target_data
+    else: 
+        return sequence_data
+
+def main(args):
+
+    # Intance our model
+    model = CNN_biLSTM_Model(input_size=51)
+
+    # Set model configs
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
+    loss_fn = nn.MSELoss() 
+
+    # Load datasets
+    train_seqs, train_targets = load_data(args.train_dir)
+    val_seqs, val_targets = load_data(args.val_dir)
+    #test_seqs, val_seqs = load_data(args.test_dir)
+    # Create custom datasets
+    train_dataset = PeptideDataset(train_seqs, train_targets)
+    val_dataset = PeptideDataset(val_seqs, val_targets)
+    #test_dataset = PeptideDataset(test_seqs)
+    # Instance data loaders
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    #test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+    # Train the model
+    train(model, train_loader, val_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
+
+    # Test the model
+    #test(model, test_loader, device=args.device)
+
+    # Save the model
+    model_path = os.path.join(args.model_dir, "model.pth")
+    torch.save(model.cpu().state_dict(), model_path)
+
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--learning_rate", type=float, required=True)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--device", type=str, default="cuda")
+    # Container env vars
+    parser.add_argument("--train_dir", type=str, default=os.environ['SM_CHANNEL_TRAINING'])
+    parser.add_argument("--val_dir", type=str, default=os.environ['SM_CHANNEL_VALIDATION'])
+    #parser.add_argument("--test_dir", type=str, default=os.environ['SM_CHANNEL_TEST'])
+    parser.add_argument("--model_dir", type=str, default=os.environ['SM_MODEL_DIR'])
+    parser.add_argument("--output_dir", type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
+
+    args = parser.parse_args()
+    print(args)
+
+    main(args)
