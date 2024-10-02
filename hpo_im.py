@@ -1,7 +1,5 @@
 import os 
 import sys
-import math
-import time
 import logging
 import argparse
 from tqdm import tqdm
@@ -240,21 +238,21 @@ def main(args):
     # Load datasets
     train_seqs, train_targets = load_data(args.train_dir)
     val_seqs, val_targets = load_data(args.val_dir)
-    #test_seqs, val_seqs = load_data(args.test_dir)
+    test_seqs, val_seqs = load_data(args.test_dir)
     # Create custom datasets
     train_dataset = PeptideDataset(train_seqs, train_targets)
     val_dataset = PeptideDataset(val_seqs, val_targets)
-    #test_dataset = PeptideDataset(test_seqs)
+    test_dataset = PeptideDataset(test_seqs)
     # Instance data loaders
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
-    #test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # Train the model
     train(model, train_loader, val_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
 
     # Test the model
-    #test(model, test_loader, device=args.device)
+    test(model, test_loader, device=args.device)
 
     # Save the model
     model_path = os.path.join(args.model_dir, "model.pth")
@@ -271,7 +269,7 @@ if __name__=="__main__":
     # Container env vars
     parser.add_argument("--train_dir", type=str, default=os.environ['SM_CHANNEL_TRAINING'])
     parser.add_argument("--val_dir", type=str, default=os.environ['SM_CHANNEL_VALIDATION'])
-    #parser.add_argument("--test_dir", type=str, default=os.environ['SM_CHANNEL_TEST'])
+    parser.add_argument("--test_dir", type=str, default=os.environ['SM_CHANNEL_TEST'])
     parser.add_argument("--model_dir", type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument("--output_dir", type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
 
