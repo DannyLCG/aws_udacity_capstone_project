@@ -90,8 +90,16 @@ class CNN_biLSTM_Model(nn.Module):
 
         return output
 
-def test(model, test_loader, device):
-    '''Define the testing loop,'''
+def test(model, test_loader, device, steps=None):
+    '''Generate predictions for the input samples using a given model.
+    ----------------------------
+    Params:
+        model: class, model to generate predictions with.
+        test_loader: PyTorch DataLoader, object to load inputs from.
+        device: str, computation device.
+        steps: int, number of steps (batches of samples) to generate predictions for.
+            If None (default) predictions will be generated until the input dataset is exhausted.
+    '''
     logger.info("Testing started.")
 
     # Move model to device
@@ -102,7 +110,11 @@ def test(model, test_loader, device):
     all_preds = []
 
     with torch.no_grad():
-        for data, _ in test_loader:
+        for (batch_idx, data) in enumerate(test_loader):
+            # Check if a step is given and predict for than number of batches
+            if steps is not None and batch_idx == steps:
+                break
+
             # Move data to device
             data = data.to(device)
             # Make predictions for the test data
@@ -252,8 +264,9 @@ def main(args):
     train(model, train_loader, val_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
 
     # Test the model
-    test(model, test_loader, device=args.device)
-
+    test_results = test(model, test_loader, device=args.device, steps=1).tolist()
+    logger.info("Test results: %s", test_results)
+    
     # Save the model
     model_path = os.path.join(args.model_dir, "model.pth")
     torch.save(model.cpu().state_dict(), model_path)
