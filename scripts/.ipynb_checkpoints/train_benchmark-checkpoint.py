@@ -144,6 +144,7 @@ class DeepCNN(nn.Module):
 
         # Flatten for fc layers
         x = x.view(x.size(0), -1)
+        #x = torch.reshape(x, (x.size(0), 9216))
 
         # FC layers
         x = F.relu(self.fc1(x))
@@ -154,7 +155,6 @@ class DeepCNN(nn.Module):
 
         return output
 
-# Define the testing loop
 # Define the testing loop
 def test(model, test_loader, device, steps=None):
     '''Define the testing loop'''
