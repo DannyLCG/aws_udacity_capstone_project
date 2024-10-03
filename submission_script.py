@@ -7,7 +7,7 @@ from sagemaker.debugger import ProfilerConfig, FrameworkProfile
 role = get_execution_role()
 # Set hyperparameters
 hyperparameters = {"epochs": "10",
-                "batch-size": "128",
+                "batch_size": "128",
                 "learning_rate": "0.015"}
 
 # Create profiling and debugging rules
@@ -26,11 +26,13 @@ profiler_config = ProfilerConfig(
 
 # Create the estimator
 estimator = PyTorch(
-    entry_point="scripts/train_benchmark.py",
+    entry_point="train_benchmark.py",
     base_job_name="sagemaker-script-mode",
     role=role,
     instance_type="ml.g4dn.xlarge",
     instance_count=2,
+    source_dir="./scripts",
+    dependencies=["./scripts/requirements.txt"],
     hyperparameters=hyperparameters,
     framework_version="2.2", #Pytorch version List of supported versions: https://github.com/aws/deep-learning-containers/blob/master/available_images.md.
     py_version="py310"
@@ -38,7 +40,7 @@ estimator = PyTorch(
 
 # Set the input channels usig the URIs from the uplpoad
 inputs = {'training': 's3://capstone520/data/train/ecoli_train_im.csv',
- 'test': 's3://capstone520/data/test/ecoli_test_im.csv'}
+          'test': 's3://capstone520/data/test/ecoli_test_im.csv'}
 
 # Launch the training job
 estimator.fit(inputs, wait=True)
