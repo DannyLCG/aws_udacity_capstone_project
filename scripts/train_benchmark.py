@@ -144,6 +144,7 @@ class DeepCNN(nn.Module):
 
         # Flatten for fc layers
         x = x.view(x.size(0), -1)
+        #x = torch.reshape(x, (x.size(0), 9216))
 
         # FC layers
         x = F.relu(self.fc1(x))
