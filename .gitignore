@@ -1,0 +1,7 @@
+# Ignore file to debug/inspect functions
+debug.ipynb
+# Notebook to run test scripts from vscode
+tests/run_tests.ipynb
+# bytecode and cache dirs
+__pycache__/
+*.py[cod]

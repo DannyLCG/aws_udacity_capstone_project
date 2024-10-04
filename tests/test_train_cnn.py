@@ -1,3 +1,4 @@
+# Script meant to test locally from the terminal or a notebook (No sagemaker adaptation)
 import os 
 import sys
 import logging
@@ -113,7 +114,7 @@ class DeepCNN(nn.Module):
         self.pool3 = nn.MaxPool1d(kernel_size=2, stride=1)
 
         # Fully connected layers
-        self.fc1 = nn.Linear(256 * 36, 512)
+        self.fc1 = nn.Linear(256 * 5, 512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128, 1)
 
@@ -126,23 +127,19 @@ class DeepCNN(nn.Module):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = self.pool1(x)
-        print("Shape after block 1: %s", x.shape)
 
         #Block 2
         x = F.relu(self.conv3(x))
         x = F.relu(self.conv4(x))
         x = self.pool2(x)
-        print("Shape after block 2: %s", x.shape)
 
         #Block 3
         x = F.relu(self.conv5(x))
         x = F.relu(self.conv6(x))
         x = self.pool3(x)
-        print("Shape after block 3: %s", x.shape)
 
         # Flatten for fc layers
         x = x.view(x.size(0), -1)
-        print("Shape after flattening: %s", x.shape)
 
         # FC layers
         x = F.relu(self.fc1(x))
