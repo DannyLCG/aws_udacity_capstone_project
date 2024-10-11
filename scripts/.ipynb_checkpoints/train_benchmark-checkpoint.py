@@ -17,7 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 # Set logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+#logger.addHandler(logging.StreamHandler(sys.stdout)) # Comment this when using the sm hook
 
 # Create profiler/debugger hook
 hook = get_hook(create_if_not_exists=True)
@@ -118,7 +118,7 @@ class DeepCNN(nn.Module):
         self.pool3 = nn.MaxPool1d(kernel_size=2, stride=1)
 
         # Fully connected layers
-        self.fc1 = nn.Linear(256 * 36, 512)
+        self.fc1 = nn.Linear(256 * 5, 512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128, 1)
 
@@ -280,7 +280,10 @@ def load_data(dataset_dir):
         return sequence_data
     
 def main(args):
-
+    # Set compute device
+    if not torch.cuda.is_available():
+        args.device = "cpu"  #Reassign the device if cuda is not available
+        print(f"CUDA not available, switching to {args.device}.")
     # Intance our model
     model = DeepCNN(input_size=51)
 
@@ -306,7 +309,7 @@ def main(args):
     logger.info("Test results: %s", test_results.tolist())
 
     # Save the model
-    model_path = os.path.join(args.model_dir, "model.pth")
+    model_path = os.path.join(args.model_dir, "benchmark.pth")
     torch.save(model.cpu().state_dict(), model_path)
 
 if __name__=="__main__":
