@@ -158,9 +158,12 @@ class DeepCNN(nn.Module):
 # Define the testing loop
 def test(model, test_loader, device, steps=None):
     '''Define the testing loop'''
+    
     logger.info("Testing started.")
+    # Set model to evaluation mode
+    model.eval()
     # ======================================================#
-        # Set hook to eval mode
+    # Set hook to eval mode
     # ======================================================#
     if hook:
         hook.set_mode(modes.EVAL)
@@ -168,8 +171,7 @@ def test(model, test_loader, device, steps=None):
     # Move model to device
     model.to(device)
     logger.info("Model moved to %s", device)
-    # Set model to evaluation mode
-    model.eval()
+    
     all_preds = []
 
     with torch.no_grad():
@@ -195,14 +197,6 @@ def test(model, test_loader, device, steps=None):
 def train(model, train_loader, optimizer, epochs, device, criterion):
     '''Define training/validation loop, return training and evaluation metrics.'''
     logger.info("Starting training.")
-    # ====================================#
-    # 1. Create the hook (created already)
-    # ====================================#
-    # ======================================================#
-    # 2. Set hook to track the loss 
-    # ======================================================#
-    if hook:
-        hook.register_loss(criterion)
 
     # move model to device
     model.to(device)
@@ -210,16 +204,13 @@ def train(model, train_loader, optimizer, epochs, device, criterion):
     
     # 0. Loop through epochs
     for epoch in tqdm(range(1, epochs + 1), desc="Training"):
-        # ======================================================#
-        # 3. Set hook to training mode
-        # ======================================================#
-        if hook:
-            hook.set_mode(modes.TRAIN)
 
         # Set model to training mode
         model.train()
         train_loss = 0
         train_preds, train_targets = [], []
+        if hook:
+            hook.set_mode(modes.TRAIN)
 
         # 1. Loop through data
         for data, target in train_loader:
@@ -255,7 +246,7 @@ def train(model, train_loader, optimizer, epochs, device, criterion):
         logger.info("Epoch %d/%d, Training MSE: %.3f", epoch, epochs, train_mse)
         logger.info("Epoch %d/%d, Training R2: %.2f, Training RMSE: %.3f, Training MAE: %.3f", epoch, epochs, train_r2, train_rmse, train_mae)
 
-    logger.info("Finished training for %ds epochs.", epochs)
+    logger.info("Finished training for %d epochs.", epochs)
 
 def load_data(dataset_dir):
     '''Function to load sequence data from a given directory.
@@ -310,7 +301,7 @@ def main(args):
 
     # Save the model
     model_path = os.path.join(args.model_dir, "benchmark.pth")
-    torch.save(model.cpu().state_dict(), model_path)
+    torch.save(model.cpu(), model_path)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
