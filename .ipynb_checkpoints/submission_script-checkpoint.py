@@ -6,7 +6,7 @@ from sagemaker.debugger import ProfilerRule, ProfilerConfig, FrameworkProfile
 
 role = get_execution_role()
 # Set hyperparameters
-hyperparameters = {"epochs": "10",
+hyperparameters = {"epochs": "30",
                 "batch_size": "128",
                 "learning_rate": "0.01"}
 
@@ -34,7 +34,7 @@ debugger_config = DebuggerHookConfig(
 
 profiler_config = ProfilerConfig(
     system_monitor_interval_millis=1000,
-    framework_profile_params=FrameworkProfile(num_steps=5)
+    framework_profile_params=FrameworkProfile(num_steps=10)
 )
 
 # Create the estimator
@@ -56,6 +56,7 @@ estimator = PyTorch(
 
 # Set the input channels usig the URIs from the uplpoad
 inputs = {'training': 's3://capstone520/data/train/ecoli_train_im.csv',
+          'validation': 's3://capstone520/data/validation/ecoli_val_im.csv',
           'test': 's3://capstone520/data/test/ecoli_test_im.csv'}
 
 # Launch the training job

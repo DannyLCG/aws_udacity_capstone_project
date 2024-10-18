@@ -194,7 +194,7 @@ def test(model, test_loader, device, steps=None):
     return all_preds
 
 #Define trainig loop
-def train(model, train_loader, optimizer, epochs, device, criterion):
+def train(model, train_loader, val_loader, optimizer, epochs, device, criterion):
     '''Define training/validation loop, return training and evaluation metrics.'''
     logger.info("Starting training.")
 
@@ -246,6 +246,44 @@ def train(model, train_loader, optimizer, epochs, device, criterion):
         logger.info("Epoch %d/%d, Training MSE: %.3f", epoch, epochs, train_mse)
         logger.info("Epoch %d/%d, Training R2: %.2f, Training RMSE: %.3f, Training MAE: %.3f", epoch, epochs, train_r2, train_rmse, train_mae)
 
+        # Perform validation
+        logger.info("Validation started.")
+
+        # Set model to validation mode
+        model.eval()
+        val_loss = 0
+        val_preds, val_targets = [], []
+
+        with torch.no_grad():
+            # 1
+            for data, target in val_loader:
+                # Move data to device
+                data, target = data.to(device), target.to(device).float()
+                # 3. Forward pass
+                preds = model(data)
+                #preds = preds.unsqueeze(1) # reshape to (batch_size, 1)
+                # 4 Compute loss
+                target = target.unsqueeze(1)
+                loss = criterion(target, preds)
+
+                # Update validation loss/epochs
+                val_loss += loss.item()
+                val_preds.extend(preds.cpu().detach().numpy())
+                val_targets.extend(target.cpu().detach().numpy())
+
+            # Compute validation metrics
+            val_loss /= len(val_loader) #avg. loss per epoch
+            val_mse = mean_squared_error(val_targets, val_preds)
+            val_rmse = np.sqrt(val_mse)
+            val_r2 = r2_score(val_targets, val_preds)
+            val_mae = mean_absolute_error(val_targets, val_preds)
+
+            # Log validation metrics
+            logger.info("Epoch %d/%d, Validation Loss: %.3f", epoch, epochs, val_loss)
+            logger.info("Epoch %d/%d, Validation MSE: %.3f", epoch, epochs, val_mse)
+            logger.info("Epoch %d/%d, Validation R2: %.2f, Validation RMSE: %.3f, Validation MAE: %.3f", epoch, epochs, val_r2,
+                        val_rmse, val_mae)
+
     logger.info("Finished training for %d epochs.", epochs)
 
 def load_data(dataset_dir):
@@ -284,16 +322,19 @@ def main(args):
 
     # Load datasets
     train_seqs, train_targets = load_data(args.train_dir)
+    val_seqs, val_targets = load_data(args.val_dir)
     test_seqs = load_data(args.test_dir)
     # Create custom datasets
     train_dataset = PeptideDataset(train_seqs, train_targets)
+    val_dataset = PeptideDataset(val_seqs, val_targets)
     test_dataset = PeptideDataset(test_seqs)
     # Instance data loaders
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # Train the model
-    train(model, train_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
+    train(model, train_loader, val_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
 
     # Test the model
     test_results = test(model, test_loader, device=args.device, steps=1)
@@ -312,6 +353,7 @@ if __name__=="__main__":
     parser.add_argument("--device", type=str, default="cuda")
     # Container env vars
     parser.add_argument("--train_dir", type=str, default=os.environ['SM_CHANNEL_TRAINING'])
+    parser.add_argument("--val_dir", type=str, default=os.environ['SM_CHANNEL_VALIDATION'])
     parser.add_argument("--test_dir", type=str, default=os.environ['SM_CHANNEL_TEST'])
     parser.add_argument("--model_dir", type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument("--output_dir", type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])

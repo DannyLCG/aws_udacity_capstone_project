@@ -17,7 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 # Set the logger
 logger = logging.getLogger(name=__name__)
 logger.setLevel(level="DEBUG")
-logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(sys.stdout)) #Comment this when using the sm hook
 
 # Define the Custom Dataset 
 class PeptideDataset(Dataset):
@@ -211,7 +211,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
             # Log validation metrics
             logger.info("Epoch %d/%d, Validation Loss: %.3f", epoch, epochs, val_loss)
-            logger.info("Epoch %d/%d, Validation MSE: %.3f", epoch, epochs, val_mse)
+            logger.info("Validation MSE: %.3f", val_mse)
             logger.info("Epoch %d/%d, Validation R2: %.2f, Validation RMSE: %.3f, Validation MAE: %.3f", epoch, epochs, val_r2,
                         val_rmse, val_mae)
 
@@ -250,7 +250,7 @@ def main(args):
     # Load datasets
     train_seqs, train_targets = load_data(args.train_dir)
     val_seqs, val_targets = load_data(args.val_dir)
-    test_seqs, val_seqs = load_data(args.test_dir)
+    test_seqs = load_data(args.test_dir)
     # Create custom datasets
     train_dataset = PeptideDataset(train_seqs, train_targets)
     val_dataset = PeptideDataset(val_seqs, val_targets)
@@ -264,8 +264,8 @@ def main(args):
     train(model, train_loader, val_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
 
     # Test the model
-    test_results = test(model, test_loader, device=args.device, steps=1).tolist()
-    logger.info("Test results: %s", test_results)
+    test_results = test(model, test_loader, device=args.device, steps=1)
+    logger.info("Test results: %s", test_results.tolist())
     
     # Save the model
     model_path = os.path.join(args.model_dir, "model.pth")
