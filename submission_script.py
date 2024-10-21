@@ -25,18 +25,16 @@ rules = [
 
 # Set profiler and debugger configs
 
-#debugger_config = DebuggerHookConfig(
-#    hook_parameters={"train.save_interval": "100", "eval.save_interval": "10"}
-#)
 debugger_config = DebuggerHookConfig(
-    collection_configs=[
-        CollectionConfig(name="losses")
-    ])
+   hook_parameters={"train.save_interval": "100", "eval.save_interval": "10"})
+# debugger_config = DebuggerHookConfig(
+#     collection_configs=[
+#         CollectionConfig(name="losses")
+#     ])
 
 profiler_config = ProfilerConfig(
     system_monitor_interval_millis=1000,
-    framework_profile_params=FrameworkProfile(num_steps=10)
-)
+    framework_profile_params=FrameworkProfile(num_steps=10))
 
 # Create the estimator
 estimator = PyTorch(

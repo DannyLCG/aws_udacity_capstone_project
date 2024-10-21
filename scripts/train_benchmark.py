@@ -4,7 +4,6 @@ import logging
 import argparse
 from tqdm import tqdm
 
-import smdebug.pytorch as smd
 from smdebug.pytorch import get_hook, modes
 from utils.encoder import OneHotEncoder
 from models.cnn_model import DeepCNN
@@ -22,8 +21,8 @@ logger.setLevel(logging.DEBUG)
 #logger.addHandler(logging.StreamHandler(sys.stdout)) # Comment this when using the sm hook
 
 # Create profiler/debugger hook
-#hook = get_hook(create_if_not_exists=True)
-hook = smd.Hook.create_from_json_file() # To record the losses
+hook = get_hook(create_if_not_exists=True)
+#hook = smd.Hook.create_from_json_file() # To record the losses
 
 # Define the Custom Dataset 
 class PeptideDataset(Dataset):
@@ -144,8 +143,6 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
         # Compute training metrics
         avg_train_loss = epoch_train_loss / len(train_loader) #Avg. loss per epoch
-        # Record training loss/epoch
-        hook.record_tensor_value(tensor_name="train_loss", tensor_value=avg_train_loss)
         train_mse = mean_squared_error(train_targets, train_preds)
         train_rmse = np.sqrt(train_mse)
         train_mae = mean_absolute_error(train_targets, train_preds)
@@ -189,8 +186,6 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
             # Compute validation metrics
             avg_val_loss = epoch_val_loss / len(val_loader) #avg. loss per epoch
-            # Record validation loss
-            hook.record_tensor_value(tensor_name="val_loss", tensor_value=avg_val_loss)
             val_mse = mean_squared_error(val_targets, val_preds)
             val_rmse = np.sqrt(val_mse)
             val_r2 = r2_score(val_targets, val_preds)
@@ -203,7 +198,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
                         val_rmse, val_mae)
 
     # Close hook
-    hook.close()
+    #hook.close()
     logger.info("Finished training for %d epochs.", epochs)
 
 def load_data(dataset_dir):

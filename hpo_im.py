@@ -4,7 +4,9 @@ import logging
 import argparse
 from tqdm import tqdm
 
+from smdebug.pytorch import get_hook, modes
 from utils.encoder import OneHotEncoder
+from models.ensemble_model import CNN_biLSTM_Model
 
 import pandas as pd
 import numpy as np
@@ -17,7 +19,10 @@ from torch.utils.data import Dataset, DataLoader
 # Set the logger
 logger = logging.getLogger(name=__name__)
 logger.setLevel(level="DEBUG")
-logger.addHandler(logging.StreamHandler(sys.stdout)) #Comment this when using the sm hook
+#logger.addHandler(logging.StreamHandler(sys.stdout)) #Comment this when using the sm hook
+
+# Create profiler/debugger hook
+hook = get_hook(create_if_not_exists=True)
 
 # Define the Custom Dataset 
 class PeptideDataset(Dataset):
@@ -44,52 +49,6 @@ class PeptideDataset(Dataset):
         else:
             return sequence_tensor
 
-# Create the custom PT model
-class CNN_biLSTM_Model(nn.Module):
-    def __init__(self, input_size, conv_filters=64, kernel_size=3, n_units=64, dropout_rate=0.5):
-        super(CNN_biLSTM_Model, self).__init__()
-
-        # Convolutional layers
-        self.conv1 = nn.Conv1d(in_channels=input_size, out_channels=conv_filters, kernel_size=kernel_size, stride=1)
-        self.conv2 = nn.Conv1d(in_channels=conv_filters, out_channels=conv_filters, kernel_size=kernel_size, stride=1)
-
-        # Bidirectional LSTM layers
-        base_log = int((torch.log2(torch.tensor(n_units)) - 1).item())
-        s_units = 2**base_log
-
-        self.bilstm1 = nn.LSTM(input_size=conv_filters, hidden_size=n_units, batch_first=True, bidirectional=True)
-        self.bilstm2 = nn.LSTM(input_size=2 * n_units, hidden_size=s_units, batch_first=True, bidirectional=True)
-
-        # Fully connected layers
-        self.fc1 = nn.Linear(2 * s_units, 100)
-        self.fc2 = nn.Linear(100, 20)
-        self.fc3 = nn.Linear(20, 1)
-
-        # Dropout layer
-        self.dropout = nn.Dropout(p=dropout_rate)
-
-
-    def forward(self, x):
-        "Define forward pass"
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.max_pool1d(x, 2) #input_tensor, kernel_size
-
-        x = x.permute(0, 2, 1) #Permute to (batch, seq_lenght, features) for LSTMs
-
-        x, _ = self.bilstm1(x) #LSTMs already have internal activation functions (sigmoid and tanh)
-        x, _ = self.bilstm2(x) #and return 2 values: the output and hidden states
-        # Take the last time step
-        x = x[:, -1, :]
-
-        x = self.dropout(x)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-
-        output = self.fc3(x) #For regression return the direct output wo. any activation function
-
-        return output
-
 def test(model, test_loader, device, steps=None):
     '''Generate predictions for the input samples using a given model.
     ----------------------------
@@ -107,6 +66,11 @@ def test(model, test_loader, device, steps=None):
     logger.info("Model moved to %s", device)
     # Set model to evaluation mode
     model.eval()
+    # ======================================================#
+    # Set hook to eval mode
+    # ======================================================#
+    if hook:
+        hook.set_mode(modes.EVAL)
     all_preds = []
 
     with torch.no_grad():
@@ -131,7 +95,9 @@ def test(model, test_loader, device, steps=None):
 def train(model, train_loader, val_loader, optimizer, epochs, device, criterion):
     '''Define training/validation loop, return training and evaluation metrics.'''
     logger.info("Starting training.")
-
+    # ====================================#
+    # 1. Create the hook (created already)
+    # ====================================#
     # move model to device
     model.to(device)
     logger.info("Model moved to %s", device)
@@ -140,6 +106,11 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
     for epoch in tqdm(range(1, epochs + 1), desc="Training"):
         # Set model in training mode
         model.train()
+        # ======================================================#
+        # 3. Set hook to training mode
+        # ======================================================#
+        if hook:
+            hook.set_mode(modes.TRAIN)
         train_loss = 0
         train_preds, train_targets = [], []
 
@@ -182,6 +153,11 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
         # Set model to validation mode
         model.eval()
+        # ======================================================#
+        # 3.1 Set hook to validation mode
+        # ======================================================#
+        if hook:
+            hook.set_mode(modes.EVAL)
         val_loss = 0
         val_preds, val_targets = [], []
 
@@ -241,7 +217,7 @@ def load_data(dataset_dir):
 def main(args):
 
     # Intance our model
-    model = CNN_biLSTM_Model(input_size=51)
+    model = CNN_biLSTM_Model(input_size=51, dropout_rate=args.dropout)
 
     # Set model configs
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
@@ -268,8 +244,8 @@ def main(args):
     logger.info("Test results: %s", test_results.tolist())
     
     # Save the model
-    model_path = os.path.join(args.model_dir, "model.pth")
-    torch.save(model.cpu().state_dict(), model_path)
+    model_path = os.path.join(args.model_dir, "ensemble_model.pth")
+    torch.save(model.cpu(), model_path)
 
 
 if __name__=="__main__":
@@ -278,6 +254,7 @@ if __name__=="__main__":
     parser.add_argument("--learning_rate", type=float, required=True)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--dropout", type=float, default=0.5)
     parser.add_argument("--device", type=str, default="cuda")
     # Container env vars
     parser.add_argument("--train_dir", type=str, default=os.environ['SM_CHANNEL_TRAINING'])
