@@ -103,9 +103,11 @@ class CNN_biLSTM_Model(nn.Module):
         return output
 
 # Define the testing loop
-def test(model, test_loader, device):
+def test(model, test_loader, device, steps=None):
     '''Define the testing loop,'''
     logger.info("Testing started.")
+    # Set model to evaluation mode
+    model.eval()
     # ======================================================#
         # Set hook to eval mode
     # ======================================================#
@@ -115,12 +117,14 @@ def test(model, test_loader, device):
     # Move model to device
     model.to(device)
     logger.info("Model moved to %s", device)
-    # Set model to evaluation mode
-    model.eval()
     all_preds = []
 
     with torch.no_grad():
-        for data in test_loader:
+        for batch_idx, data in enumerate(test_loader):
+            # Predict only for the given number of batches, if any
+            if steps is not None and batch_idx == steps:
+                break
+
             # Move data to device
             data = data.to(device)
             # Make predictions for the test data
@@ -135,7 +139,7 @@ def test(model, test_loader, device):
     return all_preds
 
 #Define trainig loop
-def train(model, train_loader, optimizer, epochs, device, criterion):
+def train(model, train_loader, val_loader, optimizer, epochs, device, criterion):
     '''Define training/validation loop, return training and evaluation metrics.'''
     logger.info("Starting training.")
     # ====================================#
@@ -144,8 +148,8 @@ def train(model, train_loader, optimizer, epochs, device, criterion):
     # ======================================================#
     # 2. Set hook to track the loss 
     # ======================================================#
-    if hook:
-        hook.register_loss(criterion)
+    #if hook:
+        #hook.register_loss(criterion)
 
     # move model to device
     model.to(device)
@@ -153,14 +157,14 @@ def train(model, train_loader, optimizer, epochs, device, criterion):
     
     # 0. Loop through epochs
     for epoch in tqdm(range(1, epochs + 1), desc="Training"):
+        # Set model to training mode
+        model.train()
         # ======================================================#
         # 3. Set hook to training mode
         # ======================================================#
         if hook:
             hook.set_mode(modes.TRAIN)
 
-        # Set model to training mode
-        model.train()
         train_loss = 0
         train_preds, train_targets = [], []
 
@@ -198,7 +202,50 @@ def train(model, train_loader, optimizer, epochs, device, criterion):
         logger.info("Epoch %d/%d, Training MSE: %.3f", epoch, epochs, train_mse)
         logger.info("Epoch %d/%d, Training R2: %.2f, Training RMSE: %.3f, Training MAE: %.3f", epoch, epochs, train_r2, train_rmse, train_mae)
 
-    logger.info("Finished training for %ds epochs.", epochs)
+        # Perform validation
+        logger.info("Validation started.")
+
+        # Set model to validation modee
+        model.eval()
+        # ======================================================#
+        # 3.1 Set hook to training mode
+        # ======================================================#
+        if hook:
+            hook.set_mode(modes.EVAL)
+        
+        val_loss = 0
+        val_preds, val_targets = [], []
+
+        # 0
+        with torch.no_grad():
+            # 1
+            for data, target in val_loader:
+                # Move data to device
+                data, target = data.to(device), target.to(device).float()
+                # 3 forward pass
+                preds = model(data)
+                # 4 compute loss
+                target = target.unsqueeze(1)
+                loss = criterion(target, preds)
+
+                # Update loss/epoch
+                val_loss += loss.item()
+                val_preds.extend(preds.cpu().detach().numpy())
+                val_targets.extend(preds.cpu().detach().numpy())
+
+            # Compute validation metrics
+            val_loss /= len(val_loader) #avg. loss per epoch
+            val_mse = mean_squared_error(val_targets, val_preds)
+            val_rmse = np.sqrt(val_mse)
+            val_r2 = r2_score(val_targets, val_preds)
+            val_mae = mean_absolute_error(val_targets, val_preds)
+
+            # Log validation metrics
+            logger.info("Epoch %d/%d, Validation Loss: %.3f", epoch, epochs, val_loss)
+            logger.info("Validation MSE: %.3f", val_mse)
+            logger.info("Epoch %d/%d, Validation R2: %.3f, Validation RMSE: %.3f, Validation MAE: %.3f", epoch, epochs, val_r2, val_rmse, val_mae)
+
+    logger.info("Finished training for %d epochs.", epochs)
 
 def load_data(dataset_dir):
     '''Function to load sequence data from a given directory.
@@ -224,7 +271,11 @@ def load_data(dataset_dir):
 
 
 def main(args):
-
+    # Set compute device
+    if not torch.cuda.is_available():
+        args.device = "cpu"  #Reassign the device if cuda is not available
+        print(f"CUDA not available, switching to {args.device}.")
+        
     # Intance our model
     model = CNN_biLSTM_Model(input_size=51)
 
@@ -234,23 +285,27 @@ def main(args):
 
     # Load datasets
     train_seqs, train_targets = load_data(args.train_dir)
-    #test_seqs, val_seqs = load_data(args.test_dir)
+    val_seqs, val_targets = load_data(args.val_dir)
+    test_seqs = load_data(args.test_dir)
     # Create custom datasets
     train_dataset = PeptideDataset(train_seqs, train_targets)
-    #test_dataset = PeptideDataset(test_seqs)
+    val_dataset = PeptideDataset(val_seqs, val_targets)
+    test_dataset = PeptideDataset(test_seqs)
     # Instance data loaders
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    #test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # Train the model
-    train(model, train_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
+    train(model, train_loader, val_loader, optimizer, args.epochs, args.device, criterion=loss_fn)
 
     # Test the model
-    #test(model, test_loader, device=args.device)
+    test_results = test(model, test_loader, device=args.device)
+    logger.info("Test results: %s", test_results.tolist())
 
     # Save the model
-    model_path = os.path.join(args.model_dir, "model.pth")
-    torch.save(model.cpu().state_dict(), model_path)
+    model_path = os.path.join(args.model_dir, "main_model.pth")
+    torch.save(model.cpu(), model_path)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
@@ -261,7 +316,8 @@ if __name__=="__main__":
     parser.add_argument("--device", type=str, default="cuda")
     # Container env vars
     parser.add_argument("--train_dir", type=str, default=os.environ['SM_CHANNEL_TRAINING'])
-    #parser.add_argument("--test_dir", type=str, default=os.environ['SM_CHANNEL_TEST'])
+    parser.add_argument("--val_dir", type=str, default=os.environ['SM_CHANNEL_VALIDATION'])
+    parser.add_argument("--test_dir", type=str, default=os.environ['SM_CHANNEL_TEST'])
     parser.add_argument("--model_dir", type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument("--output_dir", type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
 
