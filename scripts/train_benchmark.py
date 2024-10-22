@@ -1,17 +1,19 @@
 import sys
-import os 
+import os
 import logging
 import argparse
 from tqdm import tqdm
 
+import smdebug.pytorch as smd
 from smdebug.pytorch import get_hook, modes
+from utils.encoder import OneHotEncoder
+from models.cnn_model import DeepCNN
 
 import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import torch
 from torch import nn, optim
-import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
 # Set logger
@@ -20,49 +22,8 @@ logger.setLevel(logging.DEBUG)
 #logger.addHandler(logging.StreamHandler(sys.stdout)) # Comment this when using the sm hook
 
 # Create profiler/debugger hook
-hook = get_hook(create_if_not_exists=True)
-
-class OneHotEncoder:
-  def __init__(self, max_len = None, stop_signal = True):
-        self.max_len = max_len
-        self.stop_signal = stop_signal
-
-  def encode(self, sequences):
-      vocab = {
-          'A': 0, 'R': 1, 'N': 2, 'D': 3, 'C': 4,
-          'Q': 5, 'E': 6, 'G': 7, 'H':8, 'I': 9,
-          'L': 10, 'K': 11, 'M': 12, 'F' : 13, 'P': 14,
-          'S': 15, 'T': 16, 'W': 17, 'Y': 18, 'V': 19
-      }
-
-      if self.stop_signal:
-          vec_lenght = 20
-      else:
-          vec_lenght = 21
-      encoded_sequences = []
-      max_len = 0
-      for sequence in sequences:
-          sequence = sequence.upper()
-          encoded_sequence = []
-          for aa in sequence:
-              vec = [0 for _ in range(vec_lenght)]
-              pos = vocab[aa]
-              vec[pos] = 1
-              encoded_sequence.append(vec)
-          encoded_sequences.append(encoded_sequence)
-          max_len = max(max_len, len(sequence))
-
-      if self.max_len is not None:
-          max_len = self.max_len
-      max_len += 1
-      
-      if self.stop_signal:
-          for sequence in encoded_sequences:
-              while len(sequence) < max_len:
-                  vec = [0 for _ in range(vec_lenght)]
-                  vec[-1] = 1
-                  sequence.append(vec)
-      return np.array(encoded_sequences)
+#hook = get_hook(create_if_not_exists=True)
+hook = smd.Hook.create_from_json_file() # To record the losses
 
 # Define the Custom Dataset 
 class PeptideDataset(Dataset):
@@ -97,64 +58,6 @@ class PeptideDataset(Dataset):
         else:
             return sequence_tensor
         
-# Create the custom PT model
-class DeepCNN(nn.Module):
-    def __init__(self, input_size, dropout_rate=0.5):
-        super(DeepCNN, self).__init__()
-
-        # Convolutional block 1
-        self.conv1 = nn.Conv1d(in_channels=input_size, out_channels=32, kernel_size=3, stride=1)
-        self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, stride=1)
-        self.pool1 = nn.MaxPool1d(kernel_size=2, stride=1)
-
-        #Conv block 2
-        self.conv3 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1)
-        self.conv4 = nn.Conv1d(in_channels=128, out_channels=128, kernel_size=3, stride=1)
-        self.pool2 = nn.MaxPool1d(kernel_size=2, stride=1)
-        # Conv block 3
-
-        self.conv5 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, stride=1)
-        self.conv6 = nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=1)
-        self.pool3 = nn.MaxPool1d(kernel_size=2, stride=1)
-
-        # Fully connected layers
-        self.fc1 = nn.Linear(256 * 5, 512)
-        self.fc2 = nn.Linear(512, 128)
-        self.fc3 = nn.Linear(128, 1)
-
-        # Dropout layer
-        self.dropout = nn.Dropout(p=dropout_rate)
-
-    def forward(self, x):
-        "Define forward pass"
-        # Block 1
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = self.pool1(x)
-
-        #Block 2
-        x = F.relu(self.conv3(x))
-        x = F.relu(self.conv4(x))
-        x = self.pool2(x)
-
-        #Block 3
-        x = F.relu(self.conv5(x))
-        x = F.relu(self.conv6(x))
-        x = self.pool3(x)
-
-        # Flatten for fc layers
-        x = x.view(x.size(0), -1)
-        #x = torch.reshape(x, (x.size(0), 9216))
-
-        # FC layers
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = F.relu(self.fc2(x))
-
-        output = self.fc3(x) #For regression return the direct output wo. any activation function
-
-        return output
-
 # Define the testing loop
 def test(model, test_loader, device, steps=None):
     '''Define the testing loop'''
@@ -197,7 +100,9 @@ def test(model, test_loader, device, steps=None):
 def train(model, train_loader, val_loader, optimizer, epochs, device, criterion):
     '''Define training/validation loop, return training and evaluation metrics.'''
     logger.info("Starting training.")
-
+    # ====================================#
+    # 1. Create the hook (created already)
+    # ====================================#
     # move model to device
     model.to(device)
     logger.info("Model moved to %s", device)
@@ -207,8 +112,11 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
         # Set model to training mode
         model.train()
-        train_loss = 0
+        epoch_train_loss = 0
         train_preds, train_targets = [], []
+        # ======================================================#
+        # 3. Set hook to training mode
+        # ======================================================#
         if hook:
             hook.set_mode(modes.TRAIN)
 
@@ -230,19 +138,21 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
             optimizer.step()
 
             # Update training loss/epoch
-            train_loss += loss.item()
+            epoch_train_loss += loss.item()
             train_preds.extend(preds.cpu().detach().numpy())
             train_targets.extend(target.cpu().detach().numpy())
 
         # Compute training metrics
-        train_loss = train_loss / len(train_loader) #Avg. loss per epoch
+        avg_train_loss = epoch_train_loss / len(train_loader) #Avg. loss per epoch
+        # Record training loss/epoch
+        hook.record_tensor_value(tensor_name="train_loss", tensor_value=avg_train_loss)
         train_mse = mean_squared_error(train_targets, train_preds)
         train_rmse = np.sqrt(train_mse)
         train_mae = mean_absolute_error(train_targets, train_preds)
         train_r2 = r2_score(train_targets, train_preds)
         
         # Log training metrics
-        logger.info("Epoch %d/%d, Training Loss: %.3f", epoch, epochs, train_loss)
+        logger.info("Epoch %d/%d, Training Loss: %.3f", epoch, epochs, avg_train_loss)
         logger.info("Epoch %d/%d, Training MSE: %.3f", epoch, epochs, train_mse)
         logger.info("Epoch %d/%d, Training R2: %.2f, Training RMSE: %.3f, Training MAE: %.3f", epoch, epochs, train_r2, train_rmse, train_mae)
 
@@ -251,7 +161,12 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
         # Set model to validation mode
         model.eval()
-        val_loss = 0
+        # ======================================================#
+        # 3.1 Set hook to validation mode
+        # ======================================================#
+        if hook:
+            hook.set_mode(modes.EVAL)
+        epoch_val_loss = 0
         val_preds, val_targets = [], []
 
         with torch.no_grad():
@@ -267,23 +182,28 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
                 loss = criterion(target, preds)
 
                 # Update validation loss/epochs
-                val_loss += loss.item()
+                
+                epoch_val_loss += loss.item()
                 val_preds.extend(preds.cpu().detach().numpy())
                 val_targets.extend(target.cpu().detach().numpy())
 
             # Compute validation metrics
-            val_loss /= len(val_loader) #avg. loss per epoch
+            avg_val_loss = epoch_val_loss / len(val_loader) #avg. loss per epoch
+            # Record validation loss
+            hook.record_tensor_value(tensor_name="val_loss", tensor_value=avg_val_loss)
             val_mse = mean_squared_error(val_targets, val_preds)
             val_rmse = np.sqrt(val_mse)
             val_r2 = r2_score(val_targets, val_preds)
             val_mae = mean_absolute_error(val_targets, val_preds)
 
             # Log validation metrics
-            logger.info("Epoch %d/%d, Validation Loss: %.3f", epoch, epochs, val_loss)
+            logger.info("Epoch %d/%d, Validation Loss: %.3f", epoch, epochs, avg_val_loss)
             logger.info("Epoch %d/%d, Validation MSE: %.3f", epoch, epochs, val_mse)
             logger.info("Epoch %d/%d, Validation R2: %.2f, Validation RMSE: %.3f, Validation MAE: %.3f", epoch, epochs, val_r2,
                         val_rmse, val_mae)
 
+    # Close hook
+    hook.close()
     logger.info("Finished training for %d epochs.", epochs)
 
 def load_data(dataset_dir):
@@ -314,7 +234,7 @@ def main(args):
         args.device = "cpu"  #Reassign the device if cuda is not available
         print(f"CUDA not available, switching to {args.device}.")
     # Intance our model
-    model = DeepCNN(input_size=51)
+    model = DeepCNN(input_size=51, dropout_rate=args.dropout)
 
     # Set model configs
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
@@ -350,6 +270,7 @@ if __name__=="__main__":
     parser.add_argument("--learning_rate", type=float, required=True)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--dropout", type=float, default=0.5)
     parser.add_argument("--device", type=str, default="cuda")
     # Container env vars
     parser.add_argument("--train_dir", type=str, default=os.environ['SM_CHANNEL_TRAINING'])

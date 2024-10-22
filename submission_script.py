@@ -24,13 +24,14 @@ rules = [
 ]
 
 # Set profiler and debugger configs
+
 #debugger_config = DebuggerHookConfig(
-#    collection_configs=[
-#        CollectionConfig(name="losses", parameters={"save_interval": "5"})
-#    ])
+#    hook_parameters={"train.save_interval": "100", "eval.save_interval": "10"}
+#)
 debugger_config = DebuggerHookConfig(
-    hook_parameters={"train.save_interval": "100", "eval.save_interval": "10"}
-)
+    collection_configs=[
+        CollectionConfig(name="losses")
+    ])
 
 profiler_config = ProfilerConfig(
     system_monitor_interval_millis=1000,
@@ -39,12 +40,12 @@ profiler_config = ProfilerConfig(
 
 # Create the estimator
 estimator = PyTorch(
-    entry_point="train_benchmark.py",
+    entry_point="scripts/train_benchmark.py",
     base_job_name="benchmark-job",
     role=role,
     instance_type="ml.g4dn.xlarge", #ml.g4dn.xlarge, ml.m5.xlarge
     instance_count=1,
-    source_dir="./scripts",
+    source_dir="s3://capstone520/project.tar.gz", #to use custom modular code
     dependencies=["./scripts/requirements.txt"],
     hyperparameters=hyperparameters,
     debugger_hook_config=debugger_config, #Uncomment these lines to perform profiling and debug

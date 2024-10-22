@@ -21,7 +21,7 @@ class DeepCNN(nn.Module):
         self.pool3 = nn.MaxPool1d(kernel_size=2, stride=1)
 
         # Fully connected layers
-        self.fc1 = nn.Linear(256 * 36, 512)
+        self.fc1 = nn.Linear(256 * 5, 512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128, 1)
 
