@@ -18,7 +18,7 @@ from torch.utils.data import Dataset, DataLoader
 # Set logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+#logger.addHandler(logging.StreamHandler(sys.stdout))
 
 # Create profiler/debugger hook
 hook = get_hook(create_if_not_exists=True)
@@ -231,7 +231,7 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
                 # Update loss/epoch
                 val_loss += loss.item()
                 val_preds.extend(preds.cpu().detach().numpy())
-                val_targets.extend(preds.cpu().detach().numpy())
+                val_targets.extend(target.cpu().detach().numpy())
 
             # Compute validation metrics
             val_loss /= len(val_loader) #avg. loss per epoch
@@ -247,8 +247,8 @@ def train(model, train_loader, val_loader, optimizer, epochs, device, criterion)
 
     logger.info("Finished training for %d epochs.", epochs)
 
-def load_data(dataset_dir):
-    '''Function to load sequence data from a given directory.
+def load_data(dataset_dir, test=False):
+    '''Function to load dataset from a given directory.
     -------------------------------------------------
     Params:
         dataset_dir: str, The path pointong to the data in csv format.
@@ -260,15 +260,18 @@ def load_data(dataset_dir):
     # Load data from csv file and extract relevant fields
     dataset = pd.read_csv(full_path)
 
+    # Check if the required columns exist
+    if "sequence" not in dataset.columns or "pMIC" not in dataset.columns:
+        raise ValueError("Dataset must contain 'sequence' and 'pMIC' columns.")
+        
     sequence_data = np.array(dataset["sequence"])
 
-    # If the data is for testing, target value would be missing
-    if 'pMIC' in dataset.columns:
+    # To load testing data return only the sequences
+    if test:
+        return sequence_data
+    else:
         target_data = np.array(dataset["pMIC"])
         return sequence_data, target_data
-    else: 
-        return sequence_data
-
 
 def main(args):
     # Set compute device
@@ -286,7 +289,7 @@ def main(args):
     # Load datasets
     train_seqs, train_targets = load_data(args.train_dir)
     val_seqs, val_targets = load_data(args.val_dir)
-    test_seqs = load_data(args.test_dir)
+    test_seqs = load_data(args.test_dir, test=True)
     # Create custom datasets
     train_dataset = PeptideDataset(train_seqs, train_targets)
     val_dataset = PeptideDataset(val_seqs, val_targets)
@@ -304,7 +307,7 @@ def main(args):
     logger.info("Test results: %s", test_results.tolist())
 
     # Save the model
-    model_path = os.path.join(args.model_dir, "main_model.pth")
+    model_path = os.path.join(args.model_dir, "ensemble_model.pth")
     torch.save(model.cpu(), model_path)
 
 if __name__=="__main__":

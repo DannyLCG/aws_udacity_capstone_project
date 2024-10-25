@@ -245,7 +245,7 @@ def main(args):
     
     # Save the model
     model_path = os.path.join(args.model_dir, "ensemble_model.pth")
-    torch.save(model.cpu(), model_path)
+    #torch.save(model.cpu(), model_path)
 
 
 if __name__=="__main__":
