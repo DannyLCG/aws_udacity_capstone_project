@@ -308,7 +308,7 @@ def main(args):
 
     # Save the model
     model_path = os.path.join(args.model_dir, "ensemble_model.pth")
-    torch.save(model.cpu(), model_path)
+    torch.save(model.state_dict(), model_path)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
