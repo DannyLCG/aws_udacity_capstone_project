@@ -273,6 +273,21 @@ def load_data(dataset_dir, test=False):
         target_data = np.array(dataset["pMIC"])
         return sequence_data, target_data
 
+def model_fn(model_dir):
+    '''Function to defin the inference/predict call. '''
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Instance the model
+    model = model = CNN_biLSTM_Model(input_size=51)
+    model.to(device)
+    
+    # Load the trained model
+    with open(os.path.join(model_dir, "ensemble_model.pth"), "rb") as f:
+        model.load_state_dict(torch.load(f))
+
+    model.eval()
+    return model
+
 def main(args):
     # Set compute device
     if not torch.cuda.is_available():
