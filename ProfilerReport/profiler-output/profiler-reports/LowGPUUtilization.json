@@ -1,1 +1,1 @@
-{"RuleTriggered": 0, "Violations": 0, "Details": {}, "Datapoints": 259, "RuleParameters": "threshold_p95:70\nthreshold_p5:10\nwindow:500\npatience:1000"}
+{"RuleTriggered": 0, "Violations": 0, "Details": {}, "Datapoints": 264, "RuleParameters": "threshold_p95:70\nthreshold_p5:10\nwindow:500\npatience:1000"}
