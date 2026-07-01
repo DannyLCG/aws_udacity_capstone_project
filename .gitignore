@@ -6,8 +6,13 @@ tests/run_tests.ipynb
 __pycache__/
 *.py[cod]
 models/*.pth
+!models/ensemble_model.pth
 .ipynb_checkpoints/
 .vscode/
+# virtual environments (README Tier 1 creates ./env)
+env/
+.venv/
+venv/
 # artifacts
 ProfilerReport/
 blog.pdf

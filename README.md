@@ -225,7 +225,7 @@ Project: [https://github.com/DannyLCG/aws_udacity_capstone_project](https://gith
 
 <!-- BADGES -->
 [license-shield]: https://img.shields.io/github/license/DannyLCG/aws_udacity_capstone_project.svg?style=for-the-badge
-[license-url]: https://github.com/DannyLCG/aws_udacity_capstone_project/blob/master/LICENSE
+[license-url]: https://github.com/DannyLCG/aws_udacity_capstone_project/blob/main/LICENSE
 
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=0A66C2
 [linkedin-url]: https://www.linkedin.com/in/o-daniel-lopez-2aa219310
