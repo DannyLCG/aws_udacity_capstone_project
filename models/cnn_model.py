@@ -1,5 +1,5 @@
 from torch import nn
-from torch.nn.functional import functional as F
+import torch.nn.functional as F
 
 class DeepCNN(nn.Module):
     def __init__(self, input_size, dropout_rate=0.5):

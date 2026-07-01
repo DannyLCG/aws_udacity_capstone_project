@@ -5,3 +5,10 @@ tests/run_tests.ipynb
 # bytecode and cache dirs
 __pycache__/
 *.py[cod]
+models/*.pth
+.ipynb_checkpoints/
+.vscode/
+# artifacts
+ProfilerReport/
+blog.pdf
+TODO.md

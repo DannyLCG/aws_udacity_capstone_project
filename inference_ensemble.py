@@ -10,8 +10,8 @@ def model_fn(model_dir):
     model = CNN_biLSTM_Model(input_size=51)
     model.to(device)
 
-    # Load our trained model
-    with open(os.path.join(model_dir, "model.pth"), "rb") as f:
+    # Load our trained model (train_eco_im.py saves the artifact as ensemble_model.pth)
+    with open(os.path.join(model_dir, "ensemble_model.pth"), "rb") as f:
         model.load_state_dict(torch.load(f))
 
     # Set model to evaluation mode

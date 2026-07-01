@@ -1,1 +1,14 @@
+torch>=2.2
+
+# utilities
+numpy
+pandas
+scikit-learn
+tqdm
+matplotlib
+seaborn
+jupyter
+
+# AWS Sagemaker training, tuning, and deployment
+sagemaker
 smdebug

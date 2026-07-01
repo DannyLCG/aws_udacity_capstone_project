@@ -1,0 +1,19 @@
+# Normalize all text files to LF on commit
+* text=auto eol=lf
+
+# Explicitly declare common text formats
+*.py text eol=lf
+*.md text eol=lf
+*.ipynb text eol=lf
+*.csv text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+
+# Binary files — no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.pth binary
