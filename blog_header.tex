@@ -1,0 +1,21 @@
+% Pandoc header-includes for building blog.pdf (XeLaTeX/tectonic).
+% Build: pandoc blog_post.md -o blog.pdf --pdf-engine=tectonic \
+%          -V geometry:margin=1in -V fontsize=11pt -V linestretch=1.1 \
+%          -V colorlinks=true -V linkcolor=RoyalBlue -V urlcolor=RoyalBlue \
+%          -H blog_header.tex
+
+% --- Palatino (TeX Gyre Pagella) text + matching math ---
+\setmainfont{texgyrepagella}[
+  Extension = .otf,
+  UprightFont = *-regular,
+  BoldFont = *-bold,
+  ItalicFont = *-italic,
+  BoldItalicFont = *-bolditalic ]
+\usepackage{unicode-math}
+\setmathfont{texgyrepagella-math.otf}
+
+% --- polish ---
+\usepackage{microtype}
+\usepackage{xurl}          % break long URLs/DOIs so references don't overrun the margin
+\urlstyle{same}
+\setlength{\emergencystretch}{3em}  % relax justification so long DOIs don't overrun the margin

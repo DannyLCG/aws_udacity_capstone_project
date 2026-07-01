@@ -1,9 +1,9 @@
-# Capstone Project
-# AWS Machine Learning Engineer Nanodegree
-
-**Omar Daniel Lopez Olmos**
-
-**November 2024**
+---
+title: "Capstone Project"
+subtitle: "AWS Machine Learning Engineer Nanodegree"
+author: "Omar Daniel Lopez Olmos"
+date: "November 2024"
+---
 
 # Definition
 
@@ -78,13 +78,13 @@ Additionally, a 'dropout' parameter is also available to control the ammount of 
 
 ### Sequence encoding
 
-Since ML models support only numerical inputs, a suitable representation is needed to describe peptide sequences. A popular strategy among ANN users is one-hot encoding. This representation scheme preserves the amino acid order of a peptide. Each amino acid is encoded into a 20-dimensional vector, one for each canonical amino acid. Each entry is set to zero except for a 1 at the index of the amino acid of interest. A peptide sequence is thus encoded as a 20x51 matrix, where 50 is the maximum peptide length accepted plus a vector to mark the end of the sequence. Shorter peptides than the maximum length are zero-padded to the right side. This step is essential as many ANNs only accommodate input vectors of a fixed length.
+Since ML models support only numerical inputs, a suitable representation is needed to describe peptide sequences. A popular strategy among ANN users is one-hot encoding. This representation scheme preserves the amino acid order of a peptide. Each amino acid is encoded into a 20-dimensional vector, one for each canonical amino acid. Each entry is set to zero except for a 1 at the index of the amino acid of interest. A peptide sequence is thus encoded as a 51×20 matrix: 51 rows for the sequence positions — the maximum peptide length of 50 residues plus one position to mark the end of the sequence — and 20 columns, one per canonical amino acid. In the network this matrix is read as a (channels × length) = 51 × 20 tensor, which is the input block shown in the architecture figures below. Shorter peptides than the maximum length are zero-padded at the trailing positions. This step is essential as many ANNs only accommodate input vectors of a fixed length.
 
 ## Benchmark
 
-The benchmark model is a vanilla CNN with 6 convolutional layers. This architecture process the inputs through three stacked layers of two 1-D convolutional layers followed by three linear layers to perform regression. To regularize the model, a dropout layer is added between the convolutional layers and the regression module. The NN architecture is depicted below.
+The benchmark model is a vanilla CNN with 6 convolutional layers. This architecture processes the inputs through three stacked blocks of two 1-D convolutional layers, each block followed by a max-pooling layer, and then three linear layers to perform regression. To regularize the model, a dropout layer is added between the convolutional stack and the regression module. The NN architecture is depicted below.
 
-![](images/benchmark.png)
+![](images/benchmark_arch.png)
 
 # Methodology
 
@@ -92,7 +92,7 @@ The benchmark model is a vanilla CNN with 6 convolutional layers. This architect
 
 We started processing our data by removing repeated sequences, obtaining a total of 4, 540 unique peptide sequences. This dataset was randomly split into training, validation and testing sets. The training split kept 75% of the original dataset, keeping 3, 405 sequences. Both the validation and testing splits account for ~12.5% of the original dataset,  resulting in 568 and 567 sequences respectively. As described in the 'Data exploration and Visualization' section above, the GRAMPA dataset not only contains our AMP sequences, but several other physicochemical properties determined experimentally; those properties are present in each of the splits in case of further experimentation.
 
-Utility functions were created to assist the data loading and processing pipeline. The first function loads sequences and pMIC values (targets) as numpy arrays, then, this arrays are used to create a custom PyTorch *Dataset* object, which is the optimal method to feed data into PyTorch models. Inside the creation of this Dataset, each peptide array is encoded by our custom class *OneHotEncoder* into a 20x51 matrix, as described in the 'Sequence encoding' section above. A single element in the *Dataset* object is a PyTorch tensor for this matrix. Finally, the data pipeline ends with a PyTorch *DataLoader* object, which feeds the data into the model in batches of user-defined size.
+Utility functions were created to assist the data loading and processing pipeline. The first function loads sequences and pMIC values (targets) as numpy arrays, then, this arrays are used to create a custom PyTorch *Dataset* object, which is the optimal method to feed data into PyTorch models. Inside the creation of this Dataset, each peptide array is encoded by our custom class *OneHotEncoder* into a 51×20 matrix, as described in the 'Sequence encoding' section above. A single element in the *Dataset* object is a PyTorch tensor for this matrix. Finally, the data pipeline ends with a PyTorch *DataLoader* object, which feeds the data into the model in batches of user-defined size.
 
 
 ## Implementation
@@ -100,9 +100,9 @@ Utility functions were created to assist the data loading and processing pipelin
 For this project, the integration of PyTorch, SageMaker, and smdebug within the SageMaker environment provided a framework for model development, training, monitoring, and deploying. 
 
 ### Ensemble model
-The ensemble model is implemented using the PyTorch framework, using 1-D convolutional layers and LSTM layers. In this ensemble design, the input data is first processed through two convolutional layers to then flow into two bidirectional LSTM layers, and finally passed to a stack of three linear layers. **It is crucial not to apply an activation function to the the last linear layer, so it can output the direct regression value.** The image below depicts the ensemble model architecture.
+The ensemble model is implemented using the PyTorch framework, using 1-D convolutional layers and LSTM layers. In this ensemble design, the input data is first processed through two convolutional layers and a max-pooling layer to then flow into two bidirectional LSTM layers, and finally passed to a stack of three linear layers. **It is crucial not to apply an activation function to the the last linear layer, so it can output the direct regression value.** The image below depicts the ensemble model architecture.
 
-![](images/ensemble_model.png)
+![](images/ensemble_arch.png)
 
 ### Benchmark model training
 
@@ -176,7 +176,7 @@ Assessed by the employed metrics, we can confirm that the ensemble model improve
 
 At first glance, an improvement in MAE (or any of the other three metrics) from 0.607 to 0.534 may not appear significant, but we must take into account that our target values are reported in a logarithmic scale. To better understand the relevance of decimal values in our targets, we must remember that logarithmic scales amplify small numerical differences. The Clinical and Laboratory Standards Institute (CLSI) provides MIC guidelines indicating that slight measurement variations may affect interpretations of drug susceptibility, with smaller decimal differences impacting clinical relevance, especially in narrow therapeutic windows (CLSI, N.d.). For early AMP development and machine learning predictions, even such subtle differences (e.g., 4.869 vs. 4.75) may indicate biologically relevant distinctions. Considering this, our ensemble model did improved on the predictive precision that is critical to succesful clinical outcomes.
 
-#### References
+# References
 
 - Organization, W. H. (2014). Antimicrobial resistance: Tackling a crisis for the health and wealth of nations. doi:\url{https://www.who.int/news/item/29-04-2019-new-report-calls-for-urgent-action-to-avert-antimicrobial-resistance-crisis}. Accessed:
 545 2023-05-31
